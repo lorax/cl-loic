@@ -1,0 +1,12 @@
+#!/usr/bin/ecl -shell
+(require 'cl-fad)
+(push #P"../core/" asdf:*central-registry*)
+(push #P"../../getopt/" asdf:*central-registry*)
+(setf C:*user-ld-flags* '("-g"))
+(require :loic-cli)
+(let* ((filepath (car (asdf:make-build :loic-cli :type :program :monolithic t :epilogue-code '(loic-cli:main))))
+       (filename (pathname (file-namestring filepath))))
+  (cl-fad:copy-file filepath filename :overwrite t))
+(quit)
+
+; vim: set lisp softtabstop=2 expandtab filetype=lisp:

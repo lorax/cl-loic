@@ -1,0 +1,6 @@
+#!/usr/bin/sbcl --script
+(require 'asdf)
+(push #P"../core/" asdf:*central-registry*)
+(push #P"../../unix-options/" asdf:*central-registry*)
+(require 'loic-cli)
+(save-lisp-and-die "loic-cli.sbcl" :toplevel #'loic-cli:main :executable t :purify t)
