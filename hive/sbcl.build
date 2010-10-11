@@ -3,7 +3,8 @@
 (require :asdf)
 (push #P"../core/" asdf:*central-registry*)
 (push #P"../../unix-options/" asdf:*central-registry*)
-(require 'loic-cli)
-(save-lisp-and-die "loic-cli.sbcl" :toplevel #'loic-cli:main :executable t :purify t)
+(push #P"../../trivial-irc/" asdf:*central-registry*)
+(require 'loic-hive)
+(save-lisp-and-die "loic-hive.sbcl" :toplevel #'loic-hive:main :executable t :purify t)
 
 ; vim: set lisp softtabstop=2 expandtab filetype=lisp:
