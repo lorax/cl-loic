@@ -1,8 +1,0 @@
-#!/usr/bin/ecl -shell
-(require 'cl-fad)
-(let* ((filepath (car (asdf:make-build :loic :type :lib)))
-       (filename (pathname (file-namestring filepath))))
-  (cl-fad:copy-file filepath filename :overwrite t))
-(quit)
-
-; vim: set lisp softtabstop=2 expandtab filetype=lisp:

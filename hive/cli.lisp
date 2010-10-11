@@ -2,7 +2,7 @@
 (in-package loic-hive)
 
 (defparameter *options* '((port (port "80" "IRC server's port"))
-                          (logfile (logfile "Where to put logs"))
+                          (logfile (logfile ".log" "Where to put logs"))
                           (channel (channel "#loic" "Channel to wait for instructions on"))))
 
 (defparameter *desc* "Usage: loic-hive [OPTIONS] <server> ~%Summary: ~%~@{~A~%~}~%")
@@ -22,6 +22,7 @@
                                                  :username "Loic.hivemind"
                                                  :nickname (format nil "LOIC_~A" (random-string 2 2))
                                                  :logger #'princln
+                                                 :log-pathname ".log"
                                                  :server (car free))))
                     (setf *hivemind* hivemind)
                     (when logfile
