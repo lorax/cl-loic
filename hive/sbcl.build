@@ -1,4 +1,4 @@
-#!/usr/bin/sbcl --script
+#!/usr/bin/env sbcl --script
 (declaim (optimize (speed 0) (safety 0) (debug 0) (space 3)))
 (require :asdf)
 (push #P"../core/" asdf:*central-registry*)

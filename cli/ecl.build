@@ -1,4 +1,4 @@
-#!/usr/bin/ecl -shell
+#!/usr/bin/env ecl -shell
 ;(declaim (optimize (speed 0) (safety 3) (debug 3) (space 2)))
 (require :cl-fad)
 (push #P"../core/" asdf:*central-registry*)
